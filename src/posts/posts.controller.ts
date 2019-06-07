@@ -1,6 +1,9 @@
 import * as express from 'express';
 import Post from './post.interface';
 import postModel from './posts.model';
+import PostNotFoundException from '../exceptions/PostNotFoundException';
+import validationMiddleware from '../middleware/validation.middleware';
+import CreatePostDto from './post.dto';
 
 export default class PostsController {
     public path = '/posts';
@@ -15,27 +18,35 @@ export default class PostsController {
         this.router.get(this.path, this.getAllPosts);
         this.router.get(`${this.path}/:id`, this.getPostById);
         this.router
-            .patch(`${this.path}/:id`, this.modifyPost)
-            .delete(`${this.path}/:id`, this.deletePost)
-            .post(this.path, this.createPost);
+            .patch(`${this.path}/:id`, validationMiddleware(CreatePostDto, true), this.modifyPost)
+            .delete(`${this.path}/:id`, validationMiddleware(CreatePostDto, true), this.deletePost)
+            .post(this.path, validationMiddleware(CreatePostDto), this.createPost);
         // this.router.get(this.path, this.getAllPosts.bind(this))
     }
 
-    modifyPost = (request: express.Request, response: express.Response) => {
+    modifyPost = (request: express.Request, response: express.Response, next: express.NextFunction) => {
         const id = request.params.id;
         const postData: Post = request.body;
         this.post.findByIdAndUpdate(id, postData, { new: true })
             .then(post => {
-                response.send(post);
+                if (post) {
+                    response.send(post);
+                } else {
+                    next(new PostNotFoundException(id));
+                }
             })
     }
 
 
-    getPostById = (request: express.Request, response: express.Response) => {
+    getPostById = (request: express.Request, response: express.Response, next: express.NextFunction) => {
         const id = request.params.id;
         this.post.findById(id)
             .then(post => {
-                response.send(post);
+                if (post) {
+                    response.send(post);
+                } else {
+                    next(new PostNotFoundException(id));
+                }
             })
     }
 
@@ -66,7 +77,7 @@ export default class PostsController {
         if (successResponse) {
             response.send(200);
         } else {
-            next(new Error(id));
+            next(new PostNotFoundException(id));
         }
     }
 
